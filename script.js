@@ -1,37 +1,27 @@
 // ===================================
-// CONFIGURAÇÃO DA PLANILHA (DUAS ABAS)
+// FUNÇÃO: URL CSV (Google Sheets gviz) + ANTI-CACHE
 // ===================================
-// ✅ NOVO: Planilha do Distrito Ressaca
-const SHEET_ID = '1aIsq1a8Lb90M19TQdiJG_WyX7wzzC2WRohelJY6A-u8';
-
-// ✅ CONFIGURAÇÃO DAS DUAS ABAS - ATUALIZADO PARA DISTRITO RESSACA
-const SHEETS = [
-    {
-        name: 'PENDÊNCIAS RESSACA',
-        url: `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('PENDÊNCIAS RESSACA')}`
-    },
-    {
-        name: 'RESOLVIDOS',
-        url: `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('RESOLVIDOS')}`
-    }
-];
+function gvizCsvUrl(sheetId, gid) {
+  const cacheBust = Date.now();
+  return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gid}&_=${cacheBust}`;
+}
 
 // ===================================
 // CONFIGURAÇÃO DA PLANILHA (DUAS ABAS)
 // ===================================
-const SHEET_ID = '1r6NLcVkVLD5vp4UxPEa7TcreBpOd0qeNt-QREOG4Xr4';
+const SHEET_ID = '1aIsq1a8Lb90M19TQdiJG_WyX7wzzC2WRohelJY6A-u8/edit?gid';
 
 const SHEETS = [
   {
     name: 'PENDÊNCIAS ELDORADO',
     url: gvizCsvUrl(SHEET_ID, '278071504'),
-    distrito: 'ELDORADO',
+    distrito: 'RESSACA',
     tipo: 'PENDENTE'
   },
   {
     name: 'RESOLVIDOS ELDORADO',
-    url: gvizCsvUrl(SHEET_ID, '2142054254'),
-    distrito: 'ELDORADO',
+    url: gvizCsvUrl(SHEET_ID, '699447584'),
+    distrito: 'RESSACA',
     tipo: 'RESOLVIDO'
   }
 ];
@@ -1261,5 +1251,6 @@ function downloadExcel() {
     const hoje = new Date().toISOString().split('T')[0];
     XLSX.writeFile(wb, `Dados_Ressaca_${hoje}.xlsx`);
 }
+
 
 
