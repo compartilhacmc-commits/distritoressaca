@@ -9,19 +9,21 @@ function gvizCsvUrl(sheetId, gid) {
 // ===================================
 // CONFIGURAÇÃO DA PLANILHA (DUAS ABAS)
 // ===================================
-// ✅ ATUALIZADO PARA "RESSACA"
+// ✅ PLANILHA "RESSACA"
 const SHEET_ID = '1aIsq1a8Lb90M19TQdiJG_WyX7wzzC2WRohelJY6A-u8';
 
 const SHEETS = [
   {
-    name: 'PENDÊNCIAS ELDORADO',
-    url: gvizCsvUrl(SHEET_ID, '278071504'), // ✅ ABA PENDÊNCIAS RESSACA
+    // ✅ ALTERADO: ELDORADO -> RESSACA (para a tabela/gráficos não rotularem errado)
+    name: 'PENDÊNCIAS RESSACA',
+    url: gvizCsvUrl(SHEET_ID, '278071504'),
     distrito: 'ELDORADO',
     tipo: 'PENDENTE'
   },
   {
-    name: 'RESOLVIDOS ELDORADO',
-    url: gvizCsvUrl(SHEET_ID, '699447584'), // ✅ ABA RESOLVIDOS RESSACA
+    // ✅ ALTERADO: ELDORADO -> RESSACA (para a tabela/gráficos não rotularem errado)
+    name: 'RESOLVIDOS RESSACA',
+    url: gvizCsvUrl(SHEET_ID, '699447584'),
     distrito: 'ELDORADO',
     tipo: 'RESOLVIDO'
   }
@@ -493,7 +495,7 @@ function updateCharts() {
   // ✅ PENDÊNCIAS NÃO RESOLVIDAS POR UNIDADE - VERMELHO (#dc2626)
   const pendenciasNaoResolvidasUnidade = {};
   filteredData.forEach(item => {
-    if (item['_origem'] !== 'PENDÊNCIAS ELDORADO') return;
+    if (item['_origem'] !== 'PENDÊNCIAS RESSACA') return;
     if (!isPendenciaByUsuario(item)) return;
 
     const unidade = item['Unidade Solicitante'] || 'Não informado';
@@ -1150,7 +1152,7 @@ function updateTable() {
     const dataInicio = parseDate(dataInicioStr);
     let isVencendo15 = false;
 
-    if (dataInicio && origem === 'PENDÊNCIAS ELDORADO') {
+    if (dataInicio && origem === 'PENDÊNCIAS RESSACA') {
       const diasDecorridos = Math.floor((hoje - dataInicio) / (1000 * 60 * 60 * 24));
       if (diasDecorridos >= 15 && diasDecorridos < 30) isVencendo15 = true;
     }
