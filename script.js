@@ -9,19 +9,20 @@ function gvizCsvUrl(sheetId, gid) {
 // ===================================
 // CONFIGURAÇÃO DA PLANILHA (DUAS ABAS)
 // ===================================
-const SHEET_ID = '1aIsq1a8Lb90M19TQdiJG_WyX7wzzC2WRohelJY6A-u8/edit?gid';
+// ✅ ATUALIZADO PARA "RESSACA"
+const SHEET_ID = '1aIsq1a8Lb90M19TQdiJG_WyX7wzzC2WRohelJY6A-u8';
 
 const SHEETS = [
   {
     name: 'PENDÊNCIAS ELDORADO',
-    url: gvizCsvUrl(SHEET_ID, '278071504'),
-    distrito: 'RESSACA',
+    url: gvizCsvUrl(SHEET_ID, '278071504'), // ✅ ABA PENDÊNCIAS RESSACA
+    distrito: 'ELDORADO',
     tipo: 'PENDENTE'
   },
   {
     name: 'RESOLVIDOS ELDORADO',
-    url: gvizCsvUrl(SHEET_ID, '699447584'),
-    distrito: 'RESSACA',
+    url: gvizCsvUrl(SHEET_ID, '699447584'), // ✅ ABA RESOLVIDOS RESSACA
+    distrito: 'ELDORADO',
     tipo: 'RESOLVIDO'
   }
 ];
@@ -1248,9 +1249,7 @@ function downloadExcel() {
     { wch: 30 }, { wch: 30 }, { wch: 18 }, { wch: 20 },
     { wch: 25 }, { wch: 18 }, { wch: 20 }, { wch: 18 }, { wch: 20 }
   ];
-    const hoje = new Date().toISOString().split('T')[0];
-    XLSX.writeFile(wb, `Dados_Ressaca_${hoje}.xlsx`);
+
+  const hoje = new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb, `Dados_Eldorado_${hoje}.xlsx`);
 }
-
-
-
