@@ -14,14 +14,12 @@ const SHEET_ID = '1aIsq1a8Lb90M19TQdiJG_WyX7wzzC2WRohelJY6A-u8';
 
 const SHEETS = [
   {
-    // ✅ ALTERADO: ELDORADO -> RESSACA (para a tabela/gráficos não rotularem errado)
     name: 'PENDÊNCIAS RESSACA',
     url: gvizCsvUrl(SHEET_ID, '278071504'),
     distrito: 'RESSACA',
     tipo: 'PENDENTE'
   },
   {
-    // ✅ ALTERADO: ELDORADO -> RESSACA (para a tabela/gráficos não rotularem errado)
     name: 'RESOLVIDOS RESSACA',
     url: gvizCsvUrl(SHEET_ID, '699447584'),
     distrito: 'RESSACA',
@@ -141,7 +139,29 @@ function setMultiSelectText(textId, selected, fallbackLabel) {
 document.addEventListener('DOMContentLoaded', function () {
   console.log('Iniciando carregamento de dados...');
   loadData();
+  
+  // ✅ ADICIONAR LISTENER PARA REDIMENSIONAMENTO
+  window.addEventListener('resize', debounce(() => {
+    if (filteredData.length > 0) {
+      updateCharts();
+    }
+  }, 250));
 });
+
+// ===================================
+// ✅ FUNÇÃO DEBOUNCE PARA OTIMIZAR RESIZE
+// ===================================
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
 
 // ===================================
 // ✅ CARREGAR DADOS DAS DUAS ABAS
@@ -489,7 +509,7 @@ function updateCards() {
 }
 
 // ===================================
-// ✅ ATUALIZAR GRÁFICOS (CORES ALTERADAS)
+// ✅ ATUALIZAR GRÁFICOS (RESPONSIVOS + PRECISOS)
 // ===================================
 function updateCharts() {
   // ✅ PENDÊNCIAS NÃO RESOLVIDAS POR UNIDADE - VERMELHO (#dc2626)
@@ -600,24 +620,31 @@ function updateCharts() {
 
   createVerticalBarChartCenteredValue('chartPendenciasMes', mesLabels, mesValues, '#0b2a6f');
 
-  // ✅ RESOLUTIVIDADE
+  // ✅ RESOLUTIVIDADE (CORRIGIDO - USA filteredData)
   createResolutividadeChart('chartResolutividadeUnidade', 'Unidade Solicitante');
   createResolutividadeChart('chartResolutividadePrestador', 'Prestador');
 }
 
 // ===================================
-// ✅ CRIAR GRÁFICO DE RESOLUTIVIDADE (HORIZONTAL COM %)
+// ✅ CRIAR GRÁFICO DE RESOLUTIVIDADE (CORRIGIDO + RESPONSIVO)
 // ===================================
 function createResolutividadeChart(canvasId, fieldName) {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return;
 
-  if (canvasId === 'chartResolutividadeUnidade' && chartResolutividadeUnidade) chartResolutividadeUnidade.destroy();
-  if (canvasId === 'chartResolutividadePrestador' && chartResolutividadePrestador) chartResolutividadePrestador.destroy();
+  if (canvasId === 'chartResolutividadeUnidade' && chartResolutividadeUnidade) {
+    chartResolutividadeUnidade.destroy();
+    chartResolutividadeUnidade = null;
+  }
+  if (canvasId === 'chartResolutividadePrestador' && chartResolutividadePrestador) {
+    chartResolutividadePrestador.destroy();
+    chartResolutividadePrestador = null;
+  }
 
   const stats = {};
 
-  allData.forEach(item => {
+  // ✅ CORREÇÃO: USA filteredData EM VEZ DE allData
+  filteredData.forEach(item => {
     if (!isPendenciaByUsuario(item)) return;
 
     const valor = item[fieldName] || 'Não informado';
@@ -625,6 +652,7 @@ function createResolutividadeChart(canvasId, fieldName) {
 
     stats[valor].total++;
 
+    // ✅ CORREÇÃO: VERIFICA SE É DA ABA "RESOLVIDOS"
     if ((item['_origem'] || '').toUpperCase().includes('RESOLVIDOS')) {
       stats[valor].resolvidos++;
     }
@@ -701,7 +729,7 @@ function createResolutividadeChart(canvasId, fieldName) {
           grid: { display: false }
         }
       },
-      layout: { padding: { right: 60 } }
+      layout: { padding: { right: 80 } }
     },
     plugins: [{
       id: 'resolutividadeLabels',
@@ -735,15 +763,24 @@ function createResolutividadeChart(canvasId, fieldName) {
 }
 
 // ===================================
-// CRIAR GRÁFICO DE BARRAS HORIZONTAIS
+// ✅ CRIAR GRÁFICO DE BARRAS HORIZONTAIS (RESPONSIVO)
 // ===================================
 function createHorizontalBarChart(canvasId, labels, data, color) {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return;
 
-  if (canvasId === 'chartPendenciasNaoResolvidasUnidade' && chartPendenciasNaoResolvidasUnidade) chartPendenciasNaoResolvidasUnidade.destroy();
-  if (canvasId === 'chartUnidades' && chartUnidades) chartUnidades.destroy();
-  if (canvasId === 'chartEspecialidades' && chartEspecialidades) chartEspecialidades.destroy();
+  if (canvasId === 'chartPendenciasNaoResolvidasUnidade' && chartPendenciasNaoResolvidasUnidade) {
+    chartPendenciasNaoResolvidasUnidade.destroy();
+    chartPendenciasNaoResolvidasUnidade = null;
+  }
+  if (canvasId === 'chartUnidades' && chartUnidades) {
+    chartUnidades.destroy();
+    chartUnidades = null;
+  }
+  if (canvasId === 'chartEspecialidades' && chartEspecialidades) {
+    chartEspecialidades.destroy();
+    chartEspecialidades = null;
+  }
 
   const chart = new Chart(ctx, {
     type: 'bar',
@@ -777,11 +814,16 @@ function createHorizontalBarChart(canvasId, labels, data, color) {
       scales: {
         x: { display: false, grid: { display: false } },
         y: {
-          ticks: { font: { size: 12, weight: '500' }, color: '#4a5568', padding: 8 },
+          ticks: { 
+            font: { size: 12, weight: '500' }, 
+            color: '#4a5568', 
+            padding: 8,
+            autoSkip: false
+          },
           grid: { display: false }
         }
       },
-      layout: { padding: { right: 50 } }
+      layout: { padding: { right: 60 } }
     },
     plugins: [{
       id: 'customLabels',
@@ -812,14 +854,20 @@ function createHorizontalBarChart(canvasId, labels, data, color) {
 }
 
 // ===================================
-// GRÁFICO VERTICAL COM VALOR NO MEIO DA BARRA
+// ✅ GRÁFICO VERTICAL COM VALOR NO MEIO DA BARRA (RESPONSIVO)
 // ===================================
 function createVerticalBarChartCenteredValue(canvasId, labels, data, color) {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return;
 
-  if (canvasId === 'chartPendenciasPrestador' && chartPendenciasPrestador) chartPendenciasPrestador.destroy();
-  if (canvasId === 'chartPendenciasMes' && chartPendenciasMes) chartPendenciasMes.destroy();
+  if (canvasId === 'chartPendenciasPrestador' && chartPendenciasPrestador) {
+    chartPendenciasPrestador.destroy();
+    chartPendenciasPrestador = null;
+  }
+  if (canvasId === 'chartPendenciasMes' && chartPendenciasMes) {
+    chartPendenciasMes.destroy();
+    chartPendenciasMes = null;
+  }
 
   const chart = new Chart(ctx, {
     type: 'bar',
@@ -852,7 +900,14 @@ function createVerticalBarChartCenteredValue(canvasId, labels, data, color) {
       },
       scales: {
         x: {
-          ticks: { font: { size: 12, weight: '600' }, color: '#4a5568', maxRotation: 45, minRotation: 0 },
+          ticks: { 
+            font: { size: 12, weight: '600' }, 
+            color: '#4a5568', 
+            maxRotation: 45, 
+            minRotation: 0,
+            autoSkip: true,
+            maxTicksLimit: 10
+          },
           grid: { display: false }
         },
         y: {
@@ -892,13 +947,16 @@ function createVerticalBarChartCenteredValue(canvasId, labels, data, color) {
 }
 
 // ===================================
-// CRIAR GRÁFICO DE BARRAS VERTICAIS (STATUS)
+// ✅ CRIAR GRÁFICO DE BARRAS VERTICAIS (STATUS - RESPONSIVO)
 // ===================================
 function createVerticalBarChart(canvasId, labels, data, color) {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return;
 
-  if (chartStatus) chartStatus.destroy();
+  if (chartStatus) {
+    chartStatus.destroy();
+    chartStatus = null;
+  }
 
   const chart = new Chart(ctx, {
     type: 'bar',
@@ -931,7 +989,13 @@ function createVerticalBarChart(canvasId, labels, data, color) {
       },
       scales: {
         x: {
-          ticks: { font: { size: 12, weight: '600' }, color: '#4a5568', maxRotation: 45, minRotation: 0 },
+          ticks: { 
+            font: { size: 12, weight: '600' }, 
+            color: '#4a5568', 
+            maxRotation: 45, 
+            minRotation: 0,
+            autoSkip: false
+          },
           grid: { display: false }
         },
         y: {
@@ -969,13 +1033,16 @@ function createVerticalBarChart(canvasId, labels, data, color) {
 }
 
 // ===================================
-// CRIAR GRÁFICO DE PIZZA
+// ✅ CRIAR GRÁFICO DE PIZZA (RESPONSIVO)
 // ===================================
 function createPieChart(canvasId, labels, data) {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return;
 
-  if (chartPizzaStatus) chartPizzaStatus.destroy();
+  if (chartPizzaStatus) {
+    chartPizzaStatus.destroy();
+    chartPizzaStatus = null;
+  }
 
   const colors = [
     '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
@@ -1255,5 +1322,3 @@ function downloadExcel() {
   const hoje = new Date().toISOString().split('T')[0];
   XLSX.writeFile(wb, `Dados_Ressaca_${hoje}.xlsx`);
 }
-
-
