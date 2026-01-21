@@ -509,7 +509,7 @@ function updateCards() {
 }
 
 // ===================================
-// ✅ ATUALIZAR GRÁFICOS (RESPONSIVOS + PRECISOS)
+// ✅ GRÁFICOS (RESPONSIVOS + PRECISOS)
 // ===================================
 function updateCharts() {
   // ✅ PENDÊNCIAS NÃO RESOLVIDAS POR UNIDADE - VERMELHO (#dc2626)
@@ -626,25 +626,18 @@ function updateCharts() {
 }
 
 // ===================================
-// ✅ CRIAR GRÁFICO DE RESOLUTIVIDADE (CORRIGIDO + RESPONSIVO)
+// ✅ GRÁFICO DE RESOLUTIVIDADE (HORIZONTAL COM %)
 // ===================================
 function createResolutividadeChart(canvasId, fieldName) {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return;
 
-  if (canvasId === 'chartResolutividadeUnidade' && chartResolutividadeUnidade) {
-    chartResolutividadeUnidade.destroy();
-    chartResolutividadeUnidade = null;
-  }
-  if (canvasId === 'chartResolutividadePrestador' && chartResolutividadePrestador) {
-    chartResolutividadePrestador.destroy();
-    chartResolutividadePrestador = null;
-  }
+  if (canvasId === 'chartResolutividadeUnidade' && chartResolutividadeUnidade) chartResolutividadeUnidade.destroy();
+  if (canvasId === 'chartResolutividadePrestador' && chartResolutividadePrestador) chartResolutividadePrestador.destroy();
 
   const stats = {};
 
-  // ✅ CORREÇÃO: USA filteredData EM VEZ DE allData
-  filteredData.forEach(item => {
+  allData.forEach(item => {
     if (!isPendenciaByUsuario(item)) return;
 
     const valor = item[fieldName] || 'Não informado';
@@ -652,7 +645,6 @@ function createResolutividadeChart(canvasId, fieldName) {
 
     stats[valor].total++;
 
-    // ✅ CORREÇÃO: VERIFICA SE É DA ABA "RESOLVIDOS"
     if ((item['_origem'] || '').toUpperCase().includes('RESOLVIDOS')) {
       stats[valor].resolvidos++;
     }
@@ -729,7 +721,7 @@ function createResolutividadeChart(canvasId, fieldName) {
           grid: { display: false }
         }
       },
-      layout: { padding: { right: 80 } }
+      layout: { padding: { right: 60 } }
     },
     plugins: [{
       id: 'resolutividadeLabels',
@@ -763,7 +755,7 @@ function createResolutividadeChart(canvasId, fieldName) {
 }
 
 // ===================================
-// ✅ CRIAR GRÁFICO DE BARRAS HORIZONTAIS (RESPONSIVO)
+// ✅ GRÁFICO DE BARRAS HORIZONTAIS (RESPONSIVO)
 // ===================================
 function createHorizontalBarChart(canvasId, labels, data, color) {
   const ctx = document.getElementById(canvasId);
@@ -947,7 +939,7 @@ function createVerticalBarChartCenteredValue(canvasId, labels, data, color) {
 }
 
 // ===================================
-// ✅ CRIAR GRÁFICO DE BARRAS VERTICAIS (STATUS - RESPONSIVO)
+// ✅ GRÁFICO DE BARRAS VERTICAIS (STATUS - RESPONSIVO)
 // ===================================
 function createVerticalBarChart(canvasId, labels, data, color) {
   const ctx = document.getElementById(canvasId);
@@ -1033,7 +1025,7 @@ function createVerticalBarChart(canvasId, labels, data, color) {
 }
 
 // ===================================
-// ✅ CRIAR GRÁFICO DE PIZZA (RESPONSIVO)
+// ✅ GRÁFICO DE PIZZA (RESPONSIVO)
 // ===================================
 function createPieChart(canvasId, labels, data) {
   const ctx = document.getElementById(canvasId);
@@ -1322,3 +1314,4 @@ function downloadExcel() {
   const hoje = new Date().toISOString().split('T')[0];
   XLSX.writeFile(wb, `Dados_Ressaca_${hoje}.xlsx`);
 }
+
