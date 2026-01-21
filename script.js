@@ -32,6 +32,8 @@ const SHEETS = [
 // ===================================
 let allData = [];
 let filteredData = [];
+let currentItemsPerPage = 10;
+
 let chartPendenciasNaoResolvidasUnidade = null;
 let chartUnidades = null;
 let chartEspecialidades = null;
@@ -39,8 +41,9 @@ let chartStatus = null;
 let chartPizzaStatus = null;
 let chartPendenciasPrestador = null;
 let chartPendenciasMes = null;
-let chartResolutividadeUnidade = null;
-let chartResolutividadePrestador = null;
+
+// ✅ NOVO: gráfico de evolução temporal
+let chartEvolucaoTemporal = null;
 
 // ===================================
 // FUNÇÃO AUXILIAR PARA BUSCAR VALOR DE COLUNA
@@ -60,6 +63,19 @@ function getColumnValue(item, possibleNames, defaultValue = '-') {
 function isPendenciaByUsuario(item) {
   const usuario = getColumnValue(item, ['Usuário', 'Usuario', 'USUÁRIO', 'USUARIO'], '');
   return !!(usuario && String(usuario).trim() !== '');
+}
+
+// ===================================
+// ✅ HELPERS DE ORIGEM
+// ===================================
+function isOrigemPendencias(item) {
+  const origem = String(item?._origem || '').toUpperCase();
+  return origem.includes('PEND');
+}
+
+function isOrigemResolvidos(item) {
+  const origem = String(item?._origem || '').toUpperCase();
+  return origem.includes('RESOLV');
 }
 
 // ===================================
@@ -134,34 +150,21 @@ function setMultiSelectText(textId, selected, fallbackLabel) {
 }
 
 // ===================================
+// ✅ CONTROLE DE ITENS POR PÁGINA
+// ===================================
+function changeItemsPerPage() {
+  const select = document.getElementById('itemsPerPage');
+  currentItemsPerPage = parseInt(select.value);
+  updateTable();
+}
+
+// ===================================
 // INICIALIZAÇÃO
 // ===================================
 document.addEventListener('DOMContentLoaded', function () {
   console.log('Iniciando carregamento de dados...');
   loadData();
-  
-  // ✅ ADICIONAR LISTENER PARA REDIMENSIONAMENTO
-  window.addEventListener('resize', debounce(() => {
-    if (filteredData.length > 0) {
-      updateCharts();
-    }
-  }, 250));
 });
-
-// ===================================
-// ✅ FUNÇÃO DEBOUNCE PARA OTIMIZAR RESIZE
-// ===================================
-function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-}
 
 // ===================================
 // ✅ CARREGAR DADOS DAS DUAS ABAS
@@ -185,12 +188,9 @@ async function loadData() {
           csvText = csvText.replace(/^\uFEFF/, '');
 
           if (csvText.includes('<html') || csvText.includes('<!DOCTYPE')) {
-            throw new Error(
-              `Aba "${sheet.name}" retornou HTML (provável falta de permissão ou planilha não pública).`
-            );
+            throw new Error(`Aba "${sheet.name}" retornou HTML (provável falta de permissão).`);
           }
 
-          console.log(`Dados CSV da aba "${sheet.name}" recebidos`);
           return { name: sheet.name, csv: csvText };
         })
     );
@@ -200,13 +200,9 @@ async function loadData() {
     results.forEach(result => {
       const rows = parseCSV(result.csv);
 
-      if (rows.length < 2) {
-        console.warn(`Aba "${result.name}" está vazia ou sem dados`);
-        return;
-      }
+      if (rows.length < 2) return;
 
       const headers = rows[0].map(h => (h || '').trim());
-      console.log(`Cabeçalhos da aba "${result.name}":`, headers);
 
       const sheetData = rows.slice(1)
         .filter(row => row.length > 1 && (row[0] || '').trim() !== '')
@@ -219,12 +215,8 @@ async function loadData() {
           return obj;
         });
 
-      console.log(`${sheetData.length} registros carregados da aba "${result.name}"`);
       allData.push(...sheetData);
     });
-
-    console.log(`Total de registros carregados (ambas as abas): ${allData.length}`);
-    console.log('Primeiro registro completo:', allData[0]);
 
     if (allData.length === 0) {
       throw new Error('Nenhum dado foi carregado das planilhas');
@@ -234,8 +226,6 @@ async function loadData() {
 
     populateFilters();
     updateDashboard();
-
-    console.log('Dados carregados com sucesso!');
 
   } catch (error) {
     console.error('Erro ao carregar dados:', error);
@@ -306,7 +296,7 @@ function showLoading(show) {
 }
 
 // ===================================
-// ✅ POPULAR FILTROS (MULTISELECT + MÊS)
+// ✅ POPULAR FILTROS
 // ===================================
 function populateFilters() {
   const statusList = [...new Set(allData.map(item => item['Status']))].filter(Boolean).sort();
@@ -330,7 +320,7 @@ function populateFilters() {
 }
 
 // ===================================
-// ✅ POPULAR FILTRO DE MÊS (MULTISELECT STYLE)
+// ✅ POPULAR FILTRO DE MÊS
 // ===================================
 function populateMonthFilter() {
   const mesesSet = new Set();
@@ -361,7 +351,7 @@ function populateMonthFilter() {
 }
 
 // ===================================
-// ✅ APLICAR FILTROS (MULTISELECT + MÊS)
+// ✅ APLICAR FILTROS
 // ===================================
 function applyFilters() {
   const statusSel = getSelectedFromPanel('msStatusPanel');
@@ -409,7 +399,7 @@ function applyFilters() {
 }
 
 // ===================================
-// ✅ LIMPAR FILTROS (MULTISELECT + MÊS)
+// ✅ LIMPAR FILTROS
 // ===================================
 function clearFilters() {
   ['msStatusPanel', 'msUnidadePanel', 'msEspecialidadePanel', 'msPrestadorPanel', 'msMesPanel'].forEach(panelId => {
@@ -464,7 +454,7 @@ function searchTable() {
 }
 
 // ===================================
-// ATUALIZAR DASHBOARD
+// DASHBOARD
 // ===================================
 function updateDashboard() {
   updateCards();
@@ -473,7 +463,7 @@ function updateDashboard() {
 }
 
 // ===================================
-// ✅ ATUALIZAR CARDS (CONTANDO POR "USUÁRIO" PREENCHIDO)
+// ✅ CARDS
 // ===================================
 function updateCards() {
   const total = allData.length;
@@ -509,13 +499,13 @@ function updateCards() {
 }
 
 // ===================================
-// ✅ GRÁFICOS (RESPONSIVOS + PRECISOS)
+// ✅ GRÁFICOS
 // ===================================
 function updateCharts() {
-  // ✅ PENDÊNCIAS NÃO RESOLVIDAS POR UNIDADE - VERMELHO (#dc2626)
+  // Pendências não resolvidas por unidade
   const pendenciasNaoResolvidasUnidade = {};
   filteredData.forEach(item => {
-    if (item['_origem'] !== 'PENDÊNCIAS RESSACA') return;
+    if (!isOrigemPendencias(item)) return;
     if (!isPendenciaByUsuario(item)) return;
 
     const unidade = item['Unidade Solicitante'] || 'Não informado';
@@ -529,7 +519,7 @@ function updateCharts() {
 
   createHorizontalBarChart('chartPendenciasNaoResolvidasUnidade', pendenciasNRLabels, pendenciasNRValues, '#dc2626');
 
-  // Gráfico de Unidades
+  // Unidades (geral)
   const unidadesCount = {};
   filteredData.forEach(item => {
     if (!isPendenciaByUsuario(item)) return;
@@ -544,7 +534,7 @@ function updateCharts() {
 
   createHorizontalBarChart('chartUnidades', unidadesLabels, unidadesValues, '#48bb78');
 
-  // ✅ GRÁFICO DE ESPECIALIDADES - VERDE ESCURO (#065f46)
+  // Especialidades
   const especialidadesCount = {};
   filteredData.forEach(item => {
     if (!isPendenciaByUsuario(item)) return;
@@ -559,21 +549,23 @@ function updateCharts() {
 
   createHorizontalBarChart('chartEspecialidades', especialidadesLabels, especialidadesValues, '#065f46');
 
-  // Gráfico de Status
+  // Status
   const statusCount = {};
   filteredData.forEach(item => {
     const status = item['Status'] || 'Não informado';
     statusCount[status] = (statusCount[status] || 0) + 1;
   });
 
-  const statusLabels = Object.keys(statusCount)
-    .sort((a, b) => statusCount[b] - statusCount[a]);
+  const statusLabels = Object.keys(statusCount).sort((a, b) => statusCount[b] - statusCount[a]);
   const statusValues = statusLabels.map(label => statusCount[label]);
 
   createVerticalBarChart('chartStatus', statusLabels, statusValues, '#f97316');
 
-  // Gráfico de Pizza
+  // Pizza
   createPieChart('chartPizzaStatus', statusLabels, statusValues);
+
+  // ✅ Evolução Temporal de Pendências por Mês
+  createEvolucaoTemporalChart('chartEvolucaoTemporal');
 
   // Pendências por Prestador
   const prestadorCount = {};
@@ -619,185 +611,18 @@ function updateCharts() {
   const mesValues = mesLabels.map(l => mesCount[l]);
 
   createVerticalBarChartCenteredValue('chartPendenciasMes', mesLabels, mesValues, '#0b2a6f');
-
-  // ✅ RESOLUTIVIDADE (CORRIGIDO - USA filteredData)
-  createResolutividadeChart('chartResolutividadeUnidade', 'Unidade Solicitante');
-  createResolutividadeChart('chartResolutividadePrestador', 'Prestador');
 }
 
 // ===================================
-// ✅ GRÁFICO DE RESOLUTIVIDADE
-// ===================================
-function createResolutividadeChart(canvasId, fieldName) {
-  const ctx = document.getElementById(canvasId);
-  if (!ctx) return;
-
-  // Destruir gráfico anterior
-  if (canvasId === 'chartResolutividadeUnidade' && chartResolutividadeUnidade) {
-    chartResolutividadeUnidade.destroy();
-  }
-  if (canvasId === 'chartResolutividadePrestador' && chartResolutividadePrestador) {
-    chartResolutividadePrestador.destroy();
-  }
-
-  // ✅ Calcular estatísticas por unidade/prestador
-  const stats = {};
-
-  // Processar TODOS os dados (não apenas filtrados) para estatística real
-  allData.forEach(item => {
-    if (!isPendenciaByUsuario(item)) return;
-
-    const valor = item[fieldName] || 'Não informado';
-    
-    if (!stats[valor]) {
-      stats[valor] = { 
-        pendentes: 0,
-        resolvidos: 0
-      };
-    }
-
-    // Contar pendentes e resolvidos
-    if (item['_origem'] === 'PENDÊNCIAS ELDORADO') {
-      stats[valor].pendentes++;
-    } else if (item['_origem'] === 'RESOLVIDOS ELDORADO') {
-      stats[valor].resolvidos++;
-    }
-  });
-
-  // Calcular total e taxa de resolutividade
-  const data = Object.keys(stats).map(key => {
-    const total = stats[key].pendentes + stats[key].resolvidos;
-    const resolvidos = stats[key].resolvidos;
-    const taxa = total > 0 ? (resolvidos / total * 100) : 0;
-    
-    return {
-      label: key,
-      pendentes: stats[key].pendentes,
-      resolvidos: resolvidos,
-      total: total,
-      taxa: taxa
-    };
-  });
-
-  // Ordenar por taxa decrescente e pegar top 10
-  data.sort((a, b) => b.taxa - a.taxa);
-  const top10 = data.slice(0, 10);
-
-  const labels = top10.map(d => d.label);
-  const taxas = top10.map(d => d.taxa);
-
-  // ✅ gráfico com responsividade
-  const chart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [{
-        label: 'Taxa de Resolutividade (%)',
-        data: taxas,
-        backgroundColor: '#10b981',
-        borderWidth: 0,
-        borderRadius: 4,
-        barPercentage: 0.75,
-        categoryPercentage: 0.85
-      }]
-    },
-    options: {
-      indexAxis: 'y',
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          enabled: true,
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          titleFont: { size: 14, weight: 'bold' },
-          bodyFont: { size: 13 },
-          padding: 12,
-          cornerRadius: 8,
-          callbacks: {
-            label: function (context) {
-              const index = context.dataIndex;
-              const item = top10[index];
-              return [
-                `Taxa: ${item.taxa.toFixed(1)}%`,
-                `Resolvidos: ${item.resolvidos}`,
-                `Pendentes: ${item.pendentes}`,
-                `Total: ${item.total}`
-              ];
-            }
-          }
-        }
-      },
-      scales: {
-        x: {
-          display: true,
-          max: 100,
-          grid: { display: true, color: 'rgba(0,0,0,0.05)' },
-          ticks: {
-            callback: function (value) { return value + '%'; },
-            font: { size: 11 }
-          }
-        },
-        y: {
-          ticks: {
-            font: { size: window.innerWidth < 768 ? 10 : 12, weight: '500' },
-            color: '#4a5568',
-            padding: 8
-          },
-          grid: { display: false }
-        }
-      },
-      layout: { padding: { right: 80 } }
-    },
-    plugins: [{
-      id: 'resolutividadeLabels',
-      afterDatasetsDraw: function (chart) {
-        const ctx = chart.ctx;
-        chart.data.datasets.forEach(function (dataset, i) {
-          const meta = chart.getDatasetMeta(i);
-          if (!meta.hidden) {
-            meta.data.forEach(function (element, index) {
-              ctx.fillStyle = '#000000';
-              ctx.font = window.innerWidth < 768 ? 'bold 11px Arial' : 'bold 13px Arial';
-              ctx.textAlign = 'left';
-              ctx.textBaseline = 'middle';
-
-              const item = top10[index];
-              const texto = `${item.taxa.toFixed(1)}% (${item.resolvidos}/${item.total})`;
-              const xPos = element.x + 10;
-              const yPos = element.y;
-
-              ctx.fillText(texto, xPos, yPos);
-            });
-          }
-        });
-      }
-    }]
-  });
-
-  // Salvar referência
-  if (canvasId === 'chartResolutividadeUnidade') chartResolutividadeUnidade = chart;
-  if (canvasId === 'chartResolutividadePrestador') chartResolutividadePrestador = chart;
-}
-// ===================================
-// ✅ GRÁFICO DE BARRAS HORIZONTAIS (RESPONSIVO)
+// GRÁFICO DE BARRAS HORIZONTAIS
 // ===================================
 function createHorizontalBarChart(canvasId, labels, data, color) {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return;
 
-  if (canvasId === 'chartPendenciasNaoResolvidasUnidade' && chartPendenciasNaoResolvidasUnidade) {
-    chartPendenciasNaoResolvidasUnidade.destroy();
-    chartPendenciasNaoResolvidasUnidade = null;
-  }
-  if (canvasId === 'chartUnidades' && chartUnidades) {
-    chartUnidades.destroy();
-    chartUnidades = null;
-  }
-  if (canvasId === 'chartEspecialidades' && chartEspecialidades) {
-    chartEspecialidades.destroy();
-    chartEspecialidades = null;
-  }
+  if (canvasId === 'chartPendenciasNaoResolvidasUnidade' && chartPendenciasNaoResolvidasUnidade) chartPendenciasNaoResolvidasUnidade.destroy();
+  if (canvasId === 'chartUnidades' && chartUnidades) chartUnidades.destroy();
+  if (canvasId === 'chartEspecialidades' && chartEspecialidades) chartEspecialidades.destroy();
 
   const chart = new Chart(ctx, {
     type: 'bar',
@@ -831,16 +656,11 @@ function createHorizontalBarChart(canvasId, labels, data, color) {
       scales: {
         x: { display: false, grid: { display: false } },
         y: {
-          ticks: { 
-            font: { size: 12, weight: '500' }, 
-            color: '#4a5568', 
-            padding: 8,
-            autoSkip: false
-          },
+          ticks: { font: { size: 12, weight: '500' }, color: '#4a5568', padding: 8 },
           grid: { display: false }
         }
       },
-      layout: { padding: { right: 60 } }
+      layout: { padding: { right: 50 } }
     },
     plugins: [{
       id: 'customLabels',
@@ -871,20 +691,14 @@ function createHorizontalBarChart(canvasId, labels, data, color) {
 }
 
 // ===================================
-// ✅ GRÁFICO VERTICAL COM VALOR NO MEIO DA BARRA (RESPONSIVO)
+// ✅ GRÁFICO VERTICAL COM VALOR NO MEIO (BARRAS MAIS LARGAS)
 // ===================================
 function createVerticalBarChartCenteredValue(canvasId, labels, data, color) {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return;
 
-  if (canvasId === 'chartPendenciasPrestador' && chartPendenciasPrestador) {
-    chartPendenciasPrestador.destroy();
-    chartPendenciasPrestador = null;
-  }
-  if (canvasId === 'chartPendenciasMes' && chartPendenciasMes) {
-    chartPendenciasMes.destroy();
-    chartPendenciasMes = null;
-  }
+  if (canvasId === 'chartPendenciasPrestador' && chartPendenciasPrestador) chartPendenciasPrestador.destroy();
+  if (canvasId === 'chartPendenciasMes' && chartPendenciasMes) chartPendenciasMes.destroy();
 
   const chart = new Chart(ctx, {
     type: 'bar',
@@ -896,9 +710,9 @@ function createVerticalBarChartCenteredValue(canvasId, labels, data, color) {
         backgroundColor: color,
         borderWidth: 0,
         borderRadius: 6,
-        barPercentage: 0.70,
-        categoryPercentage: 0.75,
-        maxBarThickness: 40
+        barPercentage: 0.92,
+        categoryPercentage: 0.92,
+        maxBarThickness: 58
       }]
     },
     options: {
@@ -917,14 +731,7 @@ function createVerticalBarChartCenteredValue(canvasId, labels, data, color) {
       },
       scales: {
         x: {
-          ticks: { 
-            font: { size: 12, weight: '600' }, 
-            color: '#4a5568', 
-            maxRotation: 45, 
-            minRotation: 0,
-            autoSkip: true,
-            maxTicksLimit: 10
-          },
+          ticks: { font: { size: 12, weight: '600' }, color: '#4a5568', maxRotation: 45, minRotation: 0 },
           grid: { display: false }
         },
         y: {
@@ -964,16 +771,13 @@ function createVerticalBarChartCenteredValue(canvasId, labels, data, color) {
 }
 
 // ===================================
-// ✅ GRÁFICO DE BARRAS VERTICAIS (STATUS - RESPONSIVO)
+// ✅ GRÁFICO VERTICAL (STATUS) - BARRAS MAIS LARGAS
 // ===================================
 function createVerticalBarChart(canvasId, labels, data, color) {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return;
 
-  if (chartStatus) {
-    chartStatus.destroy();
-    chartStatus = null;
-  }
+  if (chartStatus) chartStatus.destroy();
 
   const chart = new Chart(ctx, {
     type: 'bar',
@@ -985,9 +789,9 @@ function createVerticalBarChart(canvasId, labels, data, color) {
         backgroundColor: color,
         borderWidth: 0,
         borderRadius: 6,
-        barPercentage: 0.55,
-        categoryPercentage: 0.70,
-        maxBarThickness: 28
+        barPercentage: 0.90,
+        categoryPercentage: 0.90,
+        maxBarThickness: 52
       }]
     },
     options: {
@@ -1006,13 +810,7 @@ function createVerticalBarChart(canvasId, labels, data, color) {
       },
       scales: {
         x: {
-          ticks: { 
-            font: { size: 12, weight: '600' }, 
-            color: '#4a5568', 
-            maxRotation: 45, 
-            minRotation: 0,
-            autoSkip: false
-          },
+          ticks: { font: { size: 12, weight: '600' }, color: '#4a5568', maxRotation: 45, minRotation: 0 },
           grid: { display: false }
         },
         y: {
@@ -1050,16 +848,129 @@ function createVerticalBarChart(canvasId, labels, data, color) {
 }
 
 // ===================================
-// ✅ GRÁFICO DE PIZZA (RESPONSIVO)
+// ✅ GRÁFICO DE EVOLUÇÃO TEMPORAL (LINHA + ÁREA)
+// ===================================
+function createEvolucaoTemporalChart(canvasId) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+
+  if (chartEvolucaoTemporal) chartEvolucaoTemporal.destroy();
+
+  // Agregar dados por mês (somente pendências)
+  const mesCountMap = {};
+
+  filteredData.forEach(item => {
+    if (!isPendenciaByUsuario(item)) return;
+
+    const dataInicio = parseDate(getColumnValue(item, [
+      'Data Início da Pendência',
+      'Data Inicio da Pendencia',
+      'Data Início Pendência',
+      'Data Inicio Pendencia'
+    ]));
+
+    if (dataInicio) {
+      const mesAno = `${dataInicio.getFullYear()}-${String(dataInicio.getMonth() + 1).padStart(2, '0')}`;
+      mesCountMap[mesAno] = (mesCountMap[mesAno] || 0) + 1;
+    }
+  });
+
+  // Ordenar cronologicamente
+  const mesesOrdenados = Object.keys(mesCountMap).sort();
+  
+  const labels = mesesOrdenados.map(mesAno => {
+    const [ano, mes] = mesAno.split('-');
+    const nomeMes = new Date(ano, mes - 1).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+    return nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
+  });
+
+  const values = mesesOrdenados.map(mesAno => mesCountMap[mesAno]);
+
+  const hasData = values.length > 0 && values.reduce((s, v) => s + v, 0) > 0;
+
+  chartEvolucaoTemporal = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: hasData ? labels : ['Sem dados'],
+      datasets: [{
+        label: 'Pendências Registradas',
+        data: hasData ? values : [0],
+        borderColor: '#f97316',
+        backgroundColor: 'rgba(249, 115, 22, 0.15)',
+        borderWidth: 3,
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#f97316',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2,
+        pointRadius: 5,
+        pointHoverRadius: 7
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            font: { size: 13, weight: 'bold' },
+            color: '#1f2937',
+            padding: 15,
+            usePointStyle: true
+          }
+        },
+        tooltip: {
+          enabled: hasData,
+          backgroundColor: 'rgba(0,0,0,0.85)',
+          titleFont: { size: 14, weight: 'bold' },
+          bodyFont: { size: 13 },
+          padding: 12,
+          cornerRadius: 8,
+          callbacks: {
+            label: function(context) {
+              return `Pendências: ${context.parsed.y}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { 
+            font: { size: 11, weight: '600' }, 
+            color: '#4a5568',
+            maxRotation: 45,
+            minRotation: 25
+          },
+          grid: { display: false }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { 
+            font: { size: 12, weight: '600' }, 
+            color: '#4a5568',
+            precision: 0
+          },
+          grid: { color: 'rgba(0,0,0,0.06)' }
+        }
+      },
+      interaction: {
+        mode: 'index',
+        intersect: false
+      }
+    }
+  });
+}
+
+// ===================================
+// GRÁFICO DE PIZZA
 // ===================================
 function createPieChart(canvasId, labels, data) {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return;
 
-  if (chartPizzaStatus) {
-    chartPizzaStatus.destroy();
-    chartPizzaStatus = null;
-  }
+  if (chartPizzaStatus) chartPizzaStatus.destroy();
 
   const colors = [
     '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
@@ -1161,7 +1072,7 @@ function createPieChart(canvasId, labels, data) {
 }
 
 // ===================================
-// ATUALIZAR TABELA
+// ✅ ATUALIZAR TABELA
 // ===================================
 function updateTable() {
   const tbody = document.getElementById('tableBody');
@@ -1178,7 +1089,9 @@ function updateTable() {
 
   const hoje = new Date();
 
-  filteredData.forEach(item => {
+  const displayData = currentItemsPerPage === -1 ? filteredData : filteredData.slice(0, currentItemsPerPage);
+
+  displayData.forEach(item => {
     const row = document.createElement('tr');
 
     const origem = item['_origem'] || '-';
@@ -1236,7 +1149,7 @@ function updateTable() {
     const dataInicio = parseDate(dataInicioStr);
     let isVencendo15 = false;
 
-    if (dataInicio && origem === 'PENDÊNCIAS RESSACA') {
+    if (dataInicio && isOrigemPendencias(item)) {
       const diasDecorridos = Math.floor((hoje - dataInicio) / (1000 * 60 * 60 * 24));
       if (diasDecorridos >= 15 && diasDecorridos < 30) isVencendo15 = true;
     }
@@ -1262,8 +1175,14 @@ function updateTable() {
   });
 
   const total = allData.length;
-  const showing = filteredData.length;
-  footer.textContent = `Mostrando de 1 até ${showing} de ${total} registros`;
+  const showing = displayData.length;
+  const filtered = filteredData.length;
+
+  if (currentItemsPerPage === -1) {
+    footer.textContent = `Mostrando ${filtered} de ${total} registros`;
+  } else {
+    footer.textContent = `Mostrando de 1 até ${showing} de ${filtered} registros (Total geral: ${total})`;
+  }
 }
 
 // ===================================
@@ -1295,7 +1214,7 @@ function formatDate(dateString) {
 }
 
 // ===================================
-// ATUALIZAR DADOS
+// DADOS
 // ===================================
 function refreshData() {
   loadData();
@@ -1339,5 +1258,4 @@ function downloadExcel() {
   const hoje = new Date().toISOString().split('T')[0];
   XLSX.writeFile(wb, `Dados_Ressaca_${hoje}.xlsx`);
 }
-
 
